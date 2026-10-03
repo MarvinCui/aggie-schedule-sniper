@@ -365,7 +365,7 @@
     const complete = groups.length > 0 && pinned.size === groups.length;
     refs.save.dataset.assDisabled = String(!complete);
     refs.save.disabled = busy || !complete;
-    refs.save.textContent = complete ? "Save" : "Select all courses";
+    refs.save.textContent = complete ? "Save" : "Select a bundle";
   }
 
   function courseColorIndex(courseKey) {
@@ -903,7 +903,7 @@
     return button;
   }
 
-  function createCourseBox(section) {
+  function createCourseBox(section, selectBundle = null) {
     const colorIndex = courseColorIndex(section.courseKey);
     const selected = isLockedSection(section);
     const box = document.createElement("article");
@@ -949,9 +949,11 @@
     const select = document.createElement("button");
     select.type = "button";
     select.className = `ass-planner__course-select${selected ? " is-selected" : ""}`;
-    select.textContent = selected ? "Selected" : "Select";
+    select.textContent = selectBundle ? "Select bundle" : selected ? "Selected" : "Select";
 
     const toggle = () => {
+      if (busy) return;
+      if (selectBundle) { selectBundle(); return; }
       if (selected) {
         pinned.delete(section.courseKey);
       } else {
@@ -1048,9 +1050,18 @@
       courses.appendChild(createCourseBox(section));
     }
 
-    panel.append(head, cal, courses);
+    panel.append(head, cal, api.createTravelPanel(ordered), courses);
     bindHoverSync(panel);
     return panel;
+  }
+
+  function selectBundle(option) {
+    if (busy) return;
+    // Select the exact displayed combination in one update, before any reranking.
+    clearTimeout(selectionFeedbackTimer);
+    refs.resultsStep.classList.remove("is-updating", "is-updated");
+    pinned = new Map(option.sections.map((section) => [section.courseKey, core.sectionKey(section)]));
+    rankOptions();
   }
 
   function createOptionCard(option, index) {
@@ -1075,6 +1086,18 @@
       }),
     );
 
+    const choose = Object.assign(document.createElement("button"), {
+      type: "button", className: "ass-planner__btn ass-planner__btn--primary ass-planner__bundle-select",
+      textContent: "Select bundle", disabled: busy,
+    });
+    choose.setAttribute("aria-label", `Select bundle ${index + 1} (${option.sections.length} courses)`);
+    const chooseBundle = () => selectBundle(option);
+    choose.addEventListener("click", (event) => { event.stopPropagation(); chooseBundle(); });
+    head.append(choose);
+    card.addEventListener("click", (event) => {
+      if (!event.target.closest("button,a,.ass-planner__course-box")) chooseBundle();
+    });
+
     const body = document.createElement("div");
     body.className = "ass-planner__card-body";
     const allSections = orderedSections(option.sections);
@@ -1086,12 +1109,12 @@
     const list = document.createElement("div");
     list.className = "ass-planner__card-courses";
     for (const section of sections) {
-      list.appendChild(createCourseBox(section));
+      list.appendChild(createCourseBox(section, chooseBundle));
     }
     body.appendChild(list);
     bindHoverSync(body);
 
-    card.append(head, createOptionIssues(option), body);
+    card.append(head, createOptionIssues(option), api.createTravelPanel(allSections), body);
     return card;
   }
 
@@ -1492,6 +1515,7 @@
                 <button type="button" class="ass-planner__btn ass-planner__btn--primary" data-ass-action="save">Save</button>
               </div>
             </div>
+            <p class="ass-planner__note">Select a bundle to choose the full schedule. You can adjust individual courses after selecting.</p>
             <p class="ass-planner__banner" hidden></p>
             <div class="ass-planner__pinned" hidden></div>
             <div class="ass-planner__cards"></div>

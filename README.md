@@ -39,8 +39,12 @@ Open **Advanced Planner** from the popup, or beside Schedule Builder's course se
 
 1. Type the courses you want (e.g. `CHE 002A`) and hit **Continue**.
 2. Slide how much you like each time of day, then each weekday, then whether class times or professor ratings matter more.
-3. Ranked options show live seats, professor ratings, and a week calendar. Select one section at a time into your selected schedule; remaining options only show what's left to choose. Selected times stay greyed on other calendars so you can see how the next pick fits.
+3. Ranked options show live seats, professor ratings, and a week calendar. Click **Select bundle** to choose every section in a ranked combination at once. You can then deselect an individual course to compare alternatives; selecting another bundle fills the complete schedule again. Selected times stay greyed on other calendars so you can see how the next choice fits.
 4. When every course is selected, **Save** writes them into Schedule Builder — replacing only an unregistered section of the same course, and skipping any course that's already registered or waitlisted.
+
+For consecutive meetings on the same day with a gap of 0–30 minutes, the regular Schedule Builder course list, calendar view, and Advanced Planner options display English **Walking: ~X min** and **Cycling: ~Y min** reminders, with spare-time or tight-transfer warnings. Estimates run offline with no API key or runtime network requests. Unknown, ambiguous, or online buildings show an unavailable message.
+
+The model uses bundled [UC Davis GIS building footprints](https://gis.ucdavis.edu/server/rest/services/Community_Basemap_Buildings2/MapServer/0) (snapshot: October 3, 2026), bounding-box centers, straight-line distance × 1.3, assumed speeds of 4.8 km/h walking and 12 km/h cycling, and buffers of 2 and 4 minutes respectively. Same-building room changes use 2 minutes for both modes. These are rough estimates, not measured routes; entrances, stairs, construction, traffic, and bicycle restrictions are not modeled. Refresh the snapshot as campus buildings change.
 
 Preferences rank options; they never hard-filter them out. If no perfect schedule exists — overlapping classes, no open seats, a clash with something else you already saved — you still get the closest options, with a banner saying exactly what had to give.
 
