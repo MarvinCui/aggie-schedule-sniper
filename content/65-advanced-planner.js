@@ -402,21 +402,6 @@
       .filter(Boolean);
   }
 
-  function rerankWithFeedback() {
-    clearTimeout(selectionFeedbackTimer);
-    refs.resultsStep.classList.remove("is-updated");
-    refs.resultsStep.classList.add("is-updating");
-    refs.count.textContent = "Updating…";
-    selectionFeedbackTimer = window.setTimeout(() => {
-      rankOptions();
-      refs.resultsStep.classList.remove("is-updating");
-      refs.resultsStep.classList.add("is-updated");
-      selectionFeedbackTimer = window.setTimeout(() => {
-        refs.resultsStep.classList.remove("is-updated");
-      }, 450);
-    }, 180);
-  }
-
   function rmpTone(value, good, middle) {
     if (value == null) {
       return "neutral";
@@ -903,7 +888,7 @@
     return button;
   }
 
-  function createCourseBox(section, selectBundle = null) {
+  function createCourseBox(section) {
     const colorIndex = courseColorIndex(section.courseKey);
     const selected = isLockedSection(section);
     const box = document.createElement("article");
@@ -949,17 +934,16 @@
     const select = document.createElement("button");
     select.type = "button";
     select.className = `ass-planner__course-select${selected ? " is-selected" : ""}`;
-    select.textContent = selectBundle ? "Select bundle" : selected ? "Selected" : "Select";
+    select.textContent = selected ? "Selected" : "Select";
 
     const toggle = () => {
       if (busy) return;
-      if (selectBundle) { selectBundle(); return; }
       if (selected) {
         pinned.delete(section.courseKey);
       } else {
         pinned.set(section.courseKey, core.sectionKey(section));
       }
-      rerankWithFeedback();
+      renderOptions();
     };
     select.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -1061,7 +1045,7 @@
     clearTimeout(selectionFeedbackTimer);
     refs.resultsStep.classList.remove("is-updating", "is-updated");
     pinned = new Map(option.sections.map((section) => [section.courseKey, core.sectionKey(section)]));
-    rankOptions();
+    renderOptions();
   }
 
   function createOptionCard(option, index) {
@@ -1086,30 +1070,28 @@
       }),
     );
 
+    const bundleSelected = option.sections.every(isLockedSection);
     const choose = Object.assign(document.createElement("button"), {
       type: "button", className: "ass-planner__btn ass-planner__btn--primary ass-planner__bundle-select",
-      textContent: "Select bundle", disabled: busy,
+      textContent: bundleSelected ? "Selected Bundle" : "Select Bundle", disabled: busy,
     });
+    choose.setAttribute("aria-pressed", String(bundleSelected));
     choose.setAttribute("aria-label", `Select bundle ${index + 1} (${option.sections.length} courses)`);
     const chooseBundle = () => selectBundle(option);
     choose.addEventListener("click", (event) => { event.stopPropagation(); chooseBundle(); });
     head.append(choose);
-    card.addEventListener("click", (event) => {
-      if (!event.target.closest("button,a,.ass-planner__course-box")) chooseBundle();
-    });
 
     const body = document.createElement("div");
     body.className = "ass-planner__card-body";
-    const allSections = orderedSections(option.sections);
-    const sections = orderedSections(
-      option.sections.filter((section) => !pinned.has(section.courseKey)),
-    );
+    // Keep every course in its original position while the student selects multiple courses.
+    const allSections = [...option.sections].sort((a, b) =>
+      String(a.courseKey).localeCompare(String(b.courseKey), undefined, { numeric: true }));
     body.appendChild(createWeekGrid(allSections));
 
     const list = document.createElement("div");
     list.className = "ass-planner__card-courses";
-    for (const section of sections) {
-      list.appendChild(createCourseBox(section, chooseBundle));
+    for (const section of allSections) {
+      list.appendChild(createCourseBox(section));
     }
     body.appendChild(list);
     bindHoverSync(body);
@@ -1129,9 +1111,7 @@
       refs.pinned.hidden = true;
     }
     const complete = groups.length > 0 && pinned.size === groups.length;
-    refs.cards.replaceChildren(
-      ...(complete ? [] : planOptions.map(createOptionCard)),
-    );
+    refs.cards.replaceChildren(...planOptions.map(createOptionCard));
     refs.count.textContent = complete
       ? "Ready to save"
       : `${planOptions.length} ${planOptions.length === 1 ? "option" : "options"}`;
@@ -1149,7 +1129,6 @@
       preferences,
       ratingWeight,
       includeWaitlist,
-      pinned,
     });
     if (!result.ok) {
       planOptions = [];
@@ -1515,7 +1494,7 @@
                 <button type="button" class="ass-planner__btn ass-planner__btn--primary" data-ass-action="save">Save</button>
               </div>
             </div>
-            <p class="ass-planner__note">Select a bundle to choose the full schedule. You can adjust individual courses after selecting.</p>
+            <p class="ass-planner__note">Select multiple courses within a bundle, or use Select Bundle for the full schedule. One section per course.</p>
             <p class="ass-planner__banner" hidden></p>
             <div class="ass-planner__pinned" hidden></div>
             <div class="ass-planner__cards"></div>
