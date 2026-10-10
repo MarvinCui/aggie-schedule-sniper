@@ -8,19 +8,6 @@
 })(globalThis, function (buildings) {
   const normalize = (value) => String(value || "").toLowerCase()
     .replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
-  // Multiple polygons may represent wings of the same named building.
-  const grouped = new Map();
-  for (const building of buildings) {
-    const key = normalize(building.name);
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(building);
-  }
-  buildings = [...grouped.values()].map((parts) => ({
-    name: parts[0].name,
-    lat: parts.reduce((sum, part) => sum + part.lat, 0) / parts.length,
-    lon: parts.reduce((sum, part) => sum + part.lon, 0) / parts.length,
-    aliases: [...new Set(parts.flatMap((part) => part.aliases))],
-  }));
   const primary = new Map(buildings.map((building) => [normalize(building.name), building]));
   const index = new Map();
   function add(alias, building) {
@@ -122,5 +109,28 @@
     return { walking: Math.ceil(distance / (4800 / 60) + 2),
       cycling: Math.ceil(distance / (12000 / 60) + 4), sameBuilding: false, origin, destination };
   }
-  return { resolve, estimate };
+  function assessTransfer(from, to, gap) {
+    const times = estimate(from, to);
+    if (!times) return null;
+    const walkSpare = gap - times.walking;
+    const bikeSpare = gap - times.cycling;
+    const isTight = walkSpare < 3 || bikeSpare < 3;
+    let status = "doable";
+    let tone = "good";
+    if (Math.max(walkSpare, bikeSpare) < 0) {
+      status = "not enough time"; tone = "short";
+    } else if (times.sameBuilding && isTight) {
+      status = "tight room change"; tone = "tight";
+    } else if (walkSpare < 0) {
+      status = "bike recommended"; tone = "tight";
+    } else if (bikeSpare < 0) {
+      status = "walk recommended"; tone = "tight";
+    } else if (walkSpare < 3) {
+      status = "tight on foot"; tone = "tight";
+    } else if (bikeSpare < 3) {
+      status = "tight by bike"; tone = "tight";
+    }
+    return { ...times, isTight, status, tone };
+  }
+  return { resolve, estimate, assessTransfer };
 });

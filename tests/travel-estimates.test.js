@@ -64,3 +64,45 @@ test('accepts a minor typo in a distinctive keyword without guessing generic or 
   assert.equal(travel.resolve('Chemistry 194').name, 'Chemistry');
   assert.equal(travel.resolve('Rock Hall 194').name, 'Peter A. Rock Hall');
 });
+
+test('cleaned building snapshot has one record per building and no unusable labels', () => {
+  const names = buildings.map(building => building.name.toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim());
+  assert.equal(new Set(names).size, buildings.length);
+  assert.ok(buildings.length < 1000);
+  for (const building of buildings) {
+    assert.equal(building.name, building.name.trim());
+    assert.ok(building.name.length > 0 && !building.name.includes('*'));
+    assert.ok(building.aliases.every(alias => alias.trim() && alias === alias.trim() && !alias.includes('*')));
+    assert.equal(new Set(building.aliases).size, building.aliases.length);
+  }
+  assert.equal(buildings.filter(building => building.name === 'Social Sciences & Humanities').length, 1);
+  assert.equal(travel.resolve('SSH 1100').name, 'Social Sciences & Humanities');
+});
+
+test('cleanup preserves separately numbered teaching buildings and removes utility records', () => {
+  const first = travel.resolve('Animal Sciences Teaching Facility 1');
+  const second = travel.resolve('Animal Sciences Teaching Facility 2');
+  assert.ok(first && second);
+  assert.notEqual(first, second);
+  assert.notEqual(first.lon, second.lon);
+  assert.ok(travel.resolve('Temporary Classroom'));
+  assert.equal(travel.resolve('Storage Unit 1'), null);
+  assert.equal(travel.resolve('Sewer Lift Station 1'), null);
+});
+
+test('transfer assessment distinguishes comfortable, tight and impossible classroom changes', () => {
+  const from = { location: 'Wellman Hall 1' };
+  const to = { location: 'Katherine Esau Science Hall 1059' };
+  const times = travel.estimate(from, to);
+  const comfortable = travel.assessTransfer(from, to, Math.max(times.walking, times.cycling) + 3);
+  assert.equal(comfortable.isTight, false);
+  assert.equal(comfortable.status, 'doable');
+  const tight = travel.assessTransfer(from, to, times.walking + 2);
+  assert.equal(tight.isTight, true);
+  assert.equal(tight.status, 'tight on foot');
+  const impossible = travel.assessTransfer(from, to, 0);
+  assert.equal(impossible.status, 'not enough time');
+  assert.equal(impossible.tone, 'short');
+  assert.equal(travel.assessTransfer(from, { location: 'TBA' }, 10), null);
+  assert.equal(travel.assessTransfer(from, { location: 'Wellman Hall 6' }, 10).isTight, false);
+});
